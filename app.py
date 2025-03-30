@@ -1,6 +1,7 @@
 import streamlit as st
 import openai
 import speech_recognition as sr
+import pyaudio
 import tempfile
 import os
 from dotenv import load_dotenv
