@@ -1,7 +1,6 @@
 import streamlit as st
 import openai
-import pyaudio
-import wave
+import speech_recognition as sr
 import tempfile
 import os
 from dotenv import load_dotenv
@@ -18,39 +17,23 @@ st.title("🎙️ English Speech-to-Text & Text-to-Speech")
 # Speech-to-Text Section
 st.header("🎤 Speech to Text")
 
-# Function to record audio using PyAudio
-def record_audio(duration=5, samplerate=44100):
+# Function to record audio using speech_recognition
+def record_audio(duration=5):
     st.info("Recording... Speak now!")
 
-    FORMAT = pyaudio.paInt16
-    CHANNELS = 1
-    CHUNK = 1024  # Buffer size
+    recognizer = sr.Recognizer()
+    microphone = sr.Microphone()
 
-    audio = pyaudio.PyAudio()
-
-    stream = audio.open(format=FORMAT, channels=CHANNELS,
-                        rate=samplerate, input=True,
-                        frames_per_buffer=CHUNK)
-
-    frames = []
-
-    for _ in range(0, int(samplerate / CHUNK * duration)):
-        data = stream.read(CHUNK)
-        frames.append(data)
-
-    stream.stop_stream()
-    stream.close()
-    audio.terminate()
+    with microphone as source:
+        recognizer.adjust_for_ambient_noise(source)
+        audio = recognizer.listen(source, timeout=duration)
 
     st.success("Recording complete!")
 
-    # Save recorded audio to a temporary .wav file
+    # Save the audio to a temporary .wav file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_wav:
-        with wave.open(tmp_wav.name, "wb") as wf:
-            wf.setnchannels(CHANNELS)
-            wf.setsampwidth(audio.get_sample_size(FORMAT))
-            wf.setframerate(samplerate)
-            wf.writeframes(b''.join(frames))
+        with open(tmp_wav.name, "wb") as f:
+            f.write(audio.get_wav_data())
         return tmp_wav.name
 
 # Option 1: Record Speech
