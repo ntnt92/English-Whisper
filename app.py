@@ -1,36 +1,56 @@
 import streamlit as st
 import openai
-import sounddevice as sd
-import numpy as np
+import pyaudio
+import wave
 import tempfile
 import os
-import wave
 from dotenv import load_dotenv
 
-
+# Load environment variables
 load_dotenv()
+
 # Set OpenAI API key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
+# Streamlit UI
 st.title("🎙️ English Speech-to-Text & Text-to-Speech")
 
 # Speech-to-Text Section
 st.header("🎤 Speech to Text")
 
-# Function to record audio
+# Function to record audio using PyAudio
 def record_audio(duration=5, samplerate=44100):
     st.info("Recording... Speak now!")
-    audio_data = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype=np.int16)
-    sd.wait()
+
+    FORMAT = pyaudio.paInt16
+    CHANNELS = 1
+    CHUNK = 1024  # Buffer size
+
+    audio = pyaudio.PyAudio()
+
+    stream = audio.open(format=FORMAT, channels=CHANNELS,
+                        rate=samplerate, input=True,
+                        frames_per_buffer=CHUNK)
+
+    frames = []
+
+    for _ in range(0, int(samplerate / CHUNK * duration)):
+        data = stream.read(CHUNK)
+        frames.append(data)
+
+    stream.stop_stream()
+    stream.close()
+    audio.terminate()
+
     st.success("Recording complete!")
 
-    # Save to temporary file
+    # Save recorded audio to a temporary .wav file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_wav:
         with wave.open(tmp_wav.name, "wb") as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
+            wf.setnchannels(CHANNELS)
+            wf.setsampwidth(audio.get_sample_size(FORMAT))
             wf.setframerate(samplerate)
-            wf.writeframes(audio_data.tobytes())
+            wf.writeframes(b''.join(frames))
         return tmp_wav.name
 
 # Option 1: Record Speech
@@ -41,7 +61,7 @@ if st.button("🎙️ Start Recording"):
         response = openai.Audio.transcribe("whisper-1", audio, language="en")
         transcript = response.get("text", "")
 
-    os.remove(audio_path)  # Clean up
+    os.remove(audio_path)  # Clean up temporary file
     st.text_area("📝 Transcribed Text:", transcript, height=150)
 
 # Option 2: Upload Audio File
